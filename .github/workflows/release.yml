@@ -53,9 +53,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "QRCode v${{ github.ref_name }}"
+          name: "QRCode ${{ github.ref_name }}"
           body: |
-            ## QRCode v${{ github.ref_name }}
+            ## QRCode ${{ github.ref_name }}
 
             扫码二维码，文本自动追加，支持撤销/恢复。
 
