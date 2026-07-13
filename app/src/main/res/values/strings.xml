@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">QRCode</string>
+    <string name="scan_success">已识别</string>
+    <string name="copied">已复制</string>
+    <string name="camera_permission_rationale">需要相机权限以扫描二维码</string>
+    <string name="camera_permission_denied">相机权限被拒绝，点击重新授权</string>
+    <string name="camera_off">摄像头已关闭</string>
+    <string name="turn_on_camera">开启摄像头</string>
+    <string name="turn_off_camera">关闭摄像头</string>
+    <string name="clear_text">清空</string>
+    <string name="backspace">退格</string>
+    <string name="copy">复制</string>
+    <string name="undo">撤销</string>
+    <string name="redo">恢复</string>
+    <string name="text_editor_hint">扫描结果将在此显示</string>
+</resources>
