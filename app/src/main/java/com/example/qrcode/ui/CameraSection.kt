@@ -102,9 +102,10 @@ fun CameraSection(
         }
         when {
             !hasCameraPermission -> CameraPermissionPlaceholder(onClick = onRequestPermission)
+            showGeneratedQr -> CameraOffPlaceholder()
             cameraEnabled -> CameraPreview(
                 onScanResult = onScanResult,
-                scanEnabled = !showGeneratedQr,
+                scanEnabled = true,
                 modifier = Modifier.fillMaxSize()
             )
             else -> CameraOffPlaceholder()

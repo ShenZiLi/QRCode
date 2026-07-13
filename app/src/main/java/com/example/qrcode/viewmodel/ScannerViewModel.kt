@@ -216,9 +216,13 @@ class ScannerViewModel : ViewModel() {
 
     /**
      * 生成二维码：将当前文本框内容作为待生成文本，触发叠加层显示。
-     * 文本为空时不做任何操作。
+     * 若叠加层已显示，则切换为隐藏。文本为空时不做任何操作。
      */
     fun onGenerateQr() {
+        if (_uiState.value.showGeneratedQr) {
+            onHideQr()
+            return
+        }
         val text = _uiState.value.text
         if (text.isEmpty()) return
         _uiState.update {
