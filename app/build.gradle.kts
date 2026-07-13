@@ -12,10 +12,19 @@ android {
         applicationId = "com.example.qrcode"
         minSdk = 34
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("VERSION_NAME") ?: "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "qrcode-keystore.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "qrcodepass"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "qrcode"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "qrcodepass"
+        }
     }
 
     buildTypes {
@@ -25,6 +34,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
