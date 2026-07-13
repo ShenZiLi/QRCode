@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -254,5 +255,48 @@ class ScannerViewModelTest {
         advanceTimeBy(1501)
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.copied)
+    }
+
+    @Test
+    fun `onGenerateQr with empty text does not change state`() = runTest(testDispatcher) {
+        // 初始状态文本为空，调用 onGenerateQr 不应有任何变化
+        viewModel.onGenerateQr()
+        val state = viewModel.uiState.value
+        assertNull(state.generatedQrText)
+        assertFalse(state.showGeneratedQr)
+    }
+
+    @Test
+    fun `onGenerateQr with non-empty text sets generatedQrText and shows overlay`() = runTest(testDispatcher) {
+        viewModel.onTextChanged("hello world")
+        advanceTimeBy(600)
+        viewModel.onGenerateQr()
+        val state = viewModel.uiState.value
+        assertEquals("hello world", state.generatedQrText)
+        assertTrue(state.showGeneratedQr)
+    }
+
+    @Test
+    fun `onHideQr clears generated state`() = runTest(testDispatcher) {
+        viewModel.onTextChanged("hello")
+        advanceTimeBy(600)
+        viewModel.onGenerateQr()
+        viewModel.onHideQr()
+        val state = viewModel.uiState.value
+        assertNull(state.generatedQrText)
+        assertFalse(state.showGeneratedQr)
+    }
+
+    @Test
+    fun `onScanSuccess ignored while generated QR overlay is showing`() = runTest(testDispatcher) {
+        // 先输入文本并生成二维码
+        viewModel.onTextChanged("original")
+        advanceTimeBy(600)
+        viewModel.onGenerateQr()
+        // 此时再扫码应被忽略
+        viewModel.onScanSuccess("scanned")
+        val state = viewModel.uiState.value
+        assertEquals("original", state.text)
+        assertFalse(state.scanSuccess)
     }
 }

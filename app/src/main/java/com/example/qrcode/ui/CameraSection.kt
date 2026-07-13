@@ -2,6 +2,11 @@ package com.example.qrcode.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -19,10 +24,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,7 +39,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.NoPhotography
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -53,6 +63,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.qrcode.R
 import com.example.qrcode.util.BarcodeAnalyzer
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 
 private val SuccessGreen = Color(0xFF4CAF50)
 
@@ -64,16 +76,35 @@ fun CameraSection(
     cameraEnabled: Boolean,
     hasCameraPermission: Boolean,
     scanSuccess: Boolean,
+    generatedQrText: String?,
+    showGeneratedQr: Boolean,
     onToggleCamera: () -> Unit,
+    onGenerateQr: () -> Unit,
+    onHideQr: () -> Unit,
     onScanResult: (String) -> Unit,
     onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
+        val context = LocalContext.current
+        LaunchedEffect(scanSuccess) {
+            if (scanSuccess) {
+                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.getSystemService(Vibrator::class.java)
+                }
+                if (vibrator?.hasVibrator() == true) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
+            }
+        }
         when {
             !hasCameraPermission -> CameraPermissionPlaceholder(onClick = onRequestPermission)
             cameraEnabled -> CameraPreview(
                 onScanResult = onScanResult,
+                scanEnabled = !showGeneratedQr,
                 modifier = Modifier.fillMaxSize()
             )
             else -> CameraOffPlaceholder()
@@ -81,14 +112,28 @@ fun CameraSection(
 
         ScanSuccessOverlay(visible = scanSuccess)
 
+        if (showGeneratedQr && generatedQrText != null) {
+            GeneratedQrOverlay(
+                qrText = generatedQrText,
+                onHide = onHideQr,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
         if (hasCameraPermission) {
-            CameraToggleButton(
-                cameraOn = cameraEnabled,
-                onClick = onToggleCamera,
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(12.dp)
-            )
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                CameraToggleButton(
+                    cameraOn = cameraEnabled,
+                    onClick = onToggleCamera
+                )
+                GenerateQrButton(onClick = onGenerateQr)
+            }
         }
     }
 }
@@ -99,12 +144,15 @@ fun CameraSection(
 @Composable
 fun CameraPreview(
     onScanResult: (String) -> Unit,
+    scanEnabled: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context) }
-    val analyzer = remember { BarcodeAnalyzer(onScanResult) }
+    val analyzer = remember(scanEnabled, onScanResult) {
+        if (scanEnabled) BarcodeAnalyzer(onScanResult) else null
+    }
 
     AndroidView(
         factory = { previewView },
@@ -122,7 +170,11 @@ fun CameraPreview(
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-                .also { it.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer) }
+                .also {
+                    if (analyzer != null) {
+                        it.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
+                    }
+                }
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
@@ -261,12 +313,10 @@ fun ScanSuccessOverlay(visible: Boolean, modifier: Modifier = Modifier) {
 @Composable
 fun CameraToggleButton(
     cameraOn: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     FloatingActionButton(
         onClick = onClick,
-        modifier = modifier,
         containerColor = if (cameraOn) MaterialTheme.colorScheme.primary else Color.DarkGray,
         contentColor = Color.White
     ) {
@@ -274,6 +324,27 @@ fun CameraToggleButton(
             imageVector = if (cameraOn) Icons.Default.NoPhotography else Icons.Default.CameraAlt,
             contentDescription = if (cameraOn) stringResource(R.string.turn_off_camera)
             else stringResource(R.string.turn_on_camera)
+        )
+    }
+}
+
+/**
+ * 生成二维码按钮（位于相机开关按钮下方）。
+ */
+@Composable
+fun GenerateQrButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = onClick,
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+    ) {
+        Icon(
+            imageVector = Icons.Default.QrCode,
+            contentDescription = stringResource(R.string.generate_qr)
         )
     }
 }
@@ -297,6 +368,65 @@ fun rememberCameraPermissionLauncher(
                 PackageManager.PERMISSION_GRANTED -> onResult(true)
                 else -> launcher.launch(Manifest.permission.CAMERA)
             }
+        }
+    }
+}
+
+/**
+ * 二维码生成叠加层：黑色半透明蒙层 + 中心白色圆角背景 + 二维码 Bitmap + 关闭按钮。
+ * 点击任意位置（除关闭按钮外）触发 onHide。
+ */
+@Composable
+fun GeneratedQrOverlay(
+    qrText: String,
+    onHide: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(qrText) {
+        val size = 512
+        val writer = QRCodeWriter()
+        val bitMatrix = writer.encode(qrText, BarcodeFormat.QR_CODE, size, size)
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bmp.setPixel(x, y, if (bitMatrix.get(x, y)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
+            }
+        }
+        bmp
+    }
+    Box(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.85f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onHide
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .background(Color.White, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = stringResource(R.string.generated_qr),
+                modifier = Modifier.size(256.dp)
+            )
+        }
+        FloatingActionButton(
+            onClick = onHide,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp),
+            containerColor = Color.White,
+            contentColor = Color.Black
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = stringResource(R.string.close_qr)
+            )
         }
     }
 }

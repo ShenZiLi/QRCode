@@ -46,7 +46,11 @@ fun ScannerScreen(
                 cameraEnabled = state.cameraEnabled,
                 hasCameraPermission = state.hasCameraPermission,
                 scanSuccess = state.scanSuccess,
+                generatedQrText = state.generatedQrText,
+                showGeneratedQr = state.showGeneratedQr,
                 onToggleCamera = viewModel::onToggleCamera,
+                onGenerateQr = viewModel::onGenerateQr,
+                onHideQr = viewModel::onHideQr,
                 onScanResult = viewModel::onScanSuccess,
                 onRequestPermission = requestPermission,
                 modifier = Modifier

@@ -13,4 +13,7 @@
     <string name="undo">撤销</string>
     <string name="redo">恢复</string>
     <string name="text_editor_hint">扫描结果将在此显示</string>
+    <string name="generate_qr">生成二维码</string>
+    <string name="close_qr">关闭二维码</string>
+    <string name="generated_qr">已生成二维码</string>
 </resources>

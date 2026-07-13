@@ -20,7 +20,9 @@ data class ScannerUiState(
     val cameraEnabled: Boolean = true,
     val hasCameraPermission: Boolean = false,
     val scanSuccess: Boolean = false,
-    val copied: Boolean = false
+    val copied: Boolean = false,
+    val generatedQrText: String? = null,
+    val showGeneratedQr: Boolean = false
 )
 
 /**
@@ -60,6 +62,7 @@ class ScannerViewModel : ViewModel() {
      */
     fun onScanSuccess(scannedText: String) {
         if (scanPaused) return
+        if (_uiState.value.showGeneratedQr) return
         val current = _uiState.value.text
         pushUndo(current)
         redoStack.clear()
@@ -203,6 +206,37 @@ class ScannerViewModel : ViewModel() {
                 text = next,
                 canUndo = undoStack.isNotEmpty(),
                 canRedo = redoStack.isNotEmpty()
+            )
+        }
+    }
+
+    // endregion
+
+    // region 生成二维码
+
+    /**
+     * 生成二维码：将当前文本框内容作为待生成文本，触发叠加层显示。
+     * 文本为空时不做任何操作。
+     */
+    fun onGenerateQr() {
+        val text = _uiState.value.text
+        if (text.isEmpty()) return
+        _uiState.update {
+            it.copy(
+                generatedQrText = text,
+                showGeneratedQr = true
+            )
+        }
+    }
+
+    /**
+     * 隐藏二维码叠加层。
+     */
+    fun onHideQr() {
+        _uiState.update {
+            it.copy(
+                generatedQrText = null,
+                showGeneratedQr = false
             )
         }
     }
